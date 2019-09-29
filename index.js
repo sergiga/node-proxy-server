@@ -10,6 +10,7 @@ app.use((req, res) => {
 
   res.proxyWs = {}
   res.proxyWs.endpoint = endpoint
+  res.proxyWs.method = req.method
 
   if (queryParams) {
     const params = {}
@@ -22,20 +23,28 @@ app.use((req, res) => {
 
   req.on('data', (dataBuffer) => {
     try {
-      res.proxyWs.request = JSON.parse(dataBuffer)
+      res.proxyWs.in = JSON.parse(dataBuffer)
     } catch (e) {}
   })
 })
 
 proxy.on('proxyRes', (proxyRes, req, res) => {
+  let out = ''
   proxyRes.on('data', (dataBuffer) => {
     if (!res.proxyWs) { return }
     res.proxyWs.status = res.statusCode
     res.proxyWs.statusMessage = res.statusMessage
     try {
-      res.proxyWs.response = JSON.parse(dataBuffer)
+      out += dataBuffer.toString()
     } catch (e) {}
-    io.emit('request', res.proxyWs)
+  })
+
+  proxyRes.on('end', () => {
+    if (!res.proxyWs) { return }
+    try {
+      res.proxyWs.out = JSON.parse(out)
+      io.emit('request', res.proxyWs)
+    } catch (e) {}
   })
 })
 
